@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>스토리 빌더</title>
+<style>
+  :root{
+    --ui-bg:#faf9f6; --ui-panel:#ffffff; --ui-border:#e2ddd2; --ui-border-strong:#cfc8b8;
+    --ui-ink:#26231d; --ui-ink-2:#5a5548; --ui-ink-3:#8b8575; --ui-accent:#a8402f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--ui-bg);color:var(--ui-ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+
+  .page-wrap{display:flex; flex-direction:column; height:100vh;}
+
+  .tabbar{flex-shrink:0; display:flex; gap:0.4rem; padding:0.6rem 1.25rem;
+    border-bottom:1px solid var(--ui-border); background:var(--ui-panel);}
+  .tabbar button{border:1px solid var(--ui-border-strong); background:#fff; color:var(--ui-ink-2);
+    padding:0.4rem 0.9rem; border-radius:5px; font-size:0.8rem; cursor:pointer; transition:all .15s;}
+  .tabbar button.active{background:var(--ui-ink); color:#fff; border-color:var(--ui-ink);}
+  .tabbar button:hover{opacity:0.85;}
+
+  .view-container{flex:1; min-height:0;}
+  .view{display:none; flex-direction:column; height:100%;}
+  .view.active{display:flex;}
+  .app-row{display:flex; flex:1; min-height:0;}
+
+  .global-footer{flex-shrink:0; border-top:1px solid var(--ui-border-strong); background:var(--ui-panel);
+    padding:0.75rem 1.25rem; display:flex; flex-wrap:wrap; gap:0.45rem; align-items:center;}
+  .global-footer .hint{font-size:0.72rem; color:var(--ui-ink-3); margin-right:0.2rem;}
+  .global-footer button{border:1px solid var(--ui-border-strong); background:#fff; color:var(--ui-ink-2);
+    padding:0.45rem 0.75rem; border-radius:5px; font-size:0.78rem; cursor:pointer; transition:all .15s;}
+  .global-footer button:hover{background:var(--ui-ink); color:#fff; border-color:var(--ui-ink);}
+
+  .editor-pane{width:46%; min-width:340px; border-right:1px solid var(--ui-border);
+    display:flex; flex-direction:column; background:var(--ui-panel);}
+  .preview-pane{flex:1; display:flex; flex-direction:column; background:var(--ui-bg);}
+
+  .pane-header{padding:0.9rem 1.25rem; border-bottom:1px solid var(--ui-border);
+    display:flex; align-items:center; justify-content:space-between; flex-shrink:0;}
+  .pane-header h2{font-size:0.95rem; margin:0; letter-spacing:0.02em;}
+  .pane-body{flex:1; overflow-y:auto; padding:1.25rem;}
+
+  .meta-fields{display:flex; flex-direction:column; gap:0.6rem; margin-bottom:1.5rem;
+    padding-bottom:1.25rem; border-bottom:1px dashed var(--ui-border);}
+  .field label{display:block; font-size:0.72rem; color:var(--ui-ink-3); margin-bottom:0.25rem; letter-spacing:0.03em;}
+  .field input, .field textarea{width:100%; padding:0.5rem 0.6rem; border:1px solid var(--ui-border-strong);
+    border-radius:4px; font-size:0.85rem; font-family:inherit; background:#fff; color:var(--ui-ink);}
+  .field textarea{resize:vertical; min-height:2.2rem; line-height:1.5;}
+
+  .format-toolbar{display:flex; align-items:center; flex-wrap:wrap; gap:0.3rem; margin-bottom:0.35rem;}
+  .format-toolbar button{border:1px solid var(--ui-border-strong); background:#fff;
+    width:1.55rem; height:1.55rem; border-radius:3px; cursor:pointer; font-size:0.72rem;
+    padding:0; display:flex; align-items:center; justify-content:center; color:var(--ui-ink-2); line-height:1;}
+  .format-toolbar button.fmt-bold{font-weight:800;}
+  .format-toolbar button:hover{opacity:0.75;}
+
+  .html-editor{flex:1; width:100%; border:none; padding:1.25rem; font-family:'Courier New',monospace;
+    font-size:0.78rem; line-height:1.6; resize:none; color:var(--ui-ink); background:#fffdf9; outline:none;}
+  .html-note{padding:0 1.25rem 0.75rem; font-size:0.72rem; color:var(--ui-ink-3);}
+
+  .block-card{border:1px solid var(--ui-border); border-radius:6px; padding:0.85rem 0.9rem;
+    margin-bottom:0.9rem; background:#fffdf9; position:relative;}
+  .block-card .block-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:0.6rem;}
+  .block-card .block-type{font-size:0.68rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--ui-accent); font-weight:600;}
+  .block-card .block-actions{display:flex; gap:0.3rem;}
+  .block-card .block-actions button{border:none; background:none; cursor:pointer; color:var(--ui-ink-3);
+    font-size:0.85rem; padding:0.15rem 0.35rem; border-radius:3px;}
+  .block-card .block-actions button:hover{background:var(--ui-border); color:var(--ui-ink);}
+  .block-card .field{margin-bottom:0.5rem;}
+  .block-card .field:last-child{margin-bottom:0;}
+  .row2{display:flex; gap:0.5rem;}
+  .row2 .field{flex:1;}
+
+  .inner-toggle{display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--ui-ink-2); margin-top:0.3rem;}
+
+  .branch-box{border:1px solid var(--ui-border); border-radius:5px; padding:0.7rem; margin-top:0.6rem; background:#faf8f3;}
+  .branch-box .branch-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;}
+  .branch-box .branch-head strong{font-size:0.78rem; color:var(--ui-ink-2);}
+  .line-item{display:flex; gap:0.4rem; align-items:flex-start; margin-bottom:0.4rem; padding:0.5rem; background:#fff; border:1px solid var(--ui-border); border-radius:4px;}
+  .line-item .line-fields{flex:1; display:flex; flex-direction:column; gap:0.3rem;}
+  .line-item select{font-size:0.72rem; padding:0.2rem; border:1px solid var(--ui-border-strong); border-radius:3px;}
+  .tiny-btn{border:1px solid var(--ui-border-strong); background:#fff; font-size:0.7rem; padding:0.25rem 0.5rem;
+    border-radius:4px; cursor:pointer; color:var(--ui-ink-2);}
+  .tiny-btn:hover{background:var(--ui-ink); color:#fff;}
+
+  .empty-hint{color:var(--ui-ink-3); font-size:0.82rem; text-align:center; padding:2rem 1rem; border:1px dashed var(--ui-border); border-radius:6px;}
+
+  #copyBtn{background:var(--ui-accent); color:#fff; border:none; padding:0.5rem 1rem; border-radius:5px;
+    font-size:0.82rem; cursor:pointer; font-weight:600; letter-spacing:0.01em;}
+  #copyBtn:hover{opacity:0.9;}
+  #copyStatus{font-size:0.76rem; color:#3b7a4a; margin-left:0.6rem;}
+
+  iframe{flex:1; width:100%; border:none; background:#fff;}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div class="tabbar">
+    <button id="tab-main" class="active" onclick="switchTab('main')">메인</button>
+    <button id="tab-html" onclick="switchTab('html')">HTML</button>
+  </div>
+
+  <div class="view-container">
+
+    <div class="view active" id="view-main">
+      <div class="app-row">
+
+        <div class="editor-pane">
+          <div class="pane-header">
+            <h2>✎ 스토리 편집</h2>
+            <div style="display:flex; gap:0.4rem;">
+              <button class="tiny-btn" onclick="triggerImport()">📥 가져오기</button>
+              <button class="tiny-btn" onclick="exportJSON()">📤 내보내기</button>
+            </div>
+          </div>
+          <div class="pane-body">
+
+            <div class="meta-fields">
+              <div class="field">
+                <label>카테고리 태그 (예: CHAPTER 01 · 회상)</label>
+                <input type="text" id="meta-category" oninput="updateMeta('category', this.value)" placeholder="CHAPTER 01">
+              </div>
+              <div class="field">
+                <label>제목</label>
+                <input type="text" id="meta-title" oninput="updateMeta('title', this.value)" placeholder="스토리 제목">
+              </div>
+              <div class="field">
+                <label>부제 / 소개 문구</label>
+                <input type="text" id="meta-subtitle" oninput="updateMeta('subtitle', this.value)" placeholder="부제목이나 짧은 소개">
+              </div>
+            </div>
+
+            <div id="blockList"></div>
+
+          </div>
+        </div>
+
+        <div class="preview-pane">
+          <div class="pane-header">
+            <h2>👁 실시간 미리보기</h2>
+            <div>
+              <button id="copyBtn" onclick="copyHTML()">📋 HTML 복사</button>
+              <span id="copyStatus"></span>
+            </div>
+          </div>
+          <iframe id="previewFrame"></iframe>
+        </div>
+
+      </div>
+
+      <div class="global-footer">
+        <span class="hint">블록 추가:</span>
+        <button onclick="addBlock('narration')">+ 나레이션</button>
+        <button onclick="addBlock('dialogue')">+ 대사</button>
+        <button onclick="addBlock('image')">+ 이미지</button>
+        <button onclick="addBlock('divider')">+ 장면 전환</button>
+        <button onclick="addBlock('choice')">+ 선택지</button>
+      </div>
+    </div>
+
+    <div class="view" id="view-html">
+      <div class="app-row">
+
+        <div class="editor-pane">
+          <div class="pane-header">
+            <h2>🖋 HTML 직접 수정</h2>
+            <button class="tiny-btn" onclick="resetHtmlFromBlocks()">블록 내용으로 새로고침</button>
+          </div>
+          <div class="html-note">여기서 수정한 내용은 왼쪽 블록 데이터에는 반영되지 않습니다. 복사해서 쓰기 전에 자유롭게 다듬어보세요.</div>
+          <textarea id="rawHtmlEditor" class="html-editor" oninput="onRawHtmlEdit()" spellcheck="false"></textarea>
+        </div>
+
+        <div class="preview-pane">
+          <div class="pane-header">
+            <h2>👁 HTML 미리보기</h2>
+            <div>
+              <button id="rawCopyBtn" onclick="copyRawHTML()">📋 HTML 복사</button>
+              <span id="rawCopyStatus"></span>
+            </div>
+          </div>
+          <iframe id="rawPreviewFrame"></iframe>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<input type="file" id="importFileInput" accept=".json,application/json" style="display:none" onchange="importJSON(event)">
+
+<script>
+let meta = { category: '', title: '', subtitle: '' };
+let blocks = [];
+let uid = 1;
+const newId = () => 'b' + (uid++);
+
+function updateMeta(field, value){ meta[field] = value; renderPreview(); }
+
+function addBlock(type){
+  const id = newId();
+  let block = { id, type };
+  if(type === 'narration') block.text = '';
+  if(type === 'dialogue'){ block.speaker=''; block.text=''; block.inner=false; }
+  if(type === 'image'){ block.src=''; block.caption=''; }
+  if(type === 'divider') block.label = '✦';
+  if(type === 'choice'){ block.branches = [ makeBranch() ]; }
+  blocks.push(block);
+  renderEditor(); renderPreview();
+}
+
+function makeBranch(){
+  return { id: newId(), label: '', lines: [ makeLine('narration') ] };
+}
+function makeLine(type){
+  return { id: newId(), type, speaker:'', text:'', inner:false };
+}
+
+function removeBlock(id){ blocks = blocks.filter(b => b.id !== id); renderEditor(); renderPreview(); }
+function moveBlock(id, dir){
+  const i = blocks.findIndex(b => b.id === id);
+  const j = i + dir;
+  if(j < 0 || j >= blocks.length) return;
+  [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+  renderEditor(); renderPreview();
+}
+function updateBlock(id, field, value){
+  const b = blocks.find(b => b.id === id);
+  if(!b) return;
+  b[field] = value;
+  renderPreview();
+}
+function toggleInner(id){
+  const b = blocks.find(b => b.id === id);
+  if(!b) return;
+  b.inner = !b.inner;
+  renderEditor(); renderPreview();
+}
+
+function addBranch(blockId){
+  const b = blocks.find(b => b.id === blockId);
+  b.branches.push(makeBranch());
+  renderEditor(); renderPreview();
+}
+function removeBranch(blockId, branchId){
+  const b = blocks.find(b => b.id === blockId);
+  b.branches = b.branches.filter(br => br.id !== branchId);
+  renderEditor(); renderPreview();
+}
+function updateBranch(blockId, branchId, field, value){
+  const b = blocks.find(b => b.id === blockId);
+  const br = b.branches.find(br => br.id === branchId);
+  br[field] = value;
+  renderPreview();
+}
+function addLine(blockId, branchId, type){
+  const b = blocks.find(b => b.id === blockId);
+  const br = b.branches.find(br => br.id === branchId);
+  br.lines.push(makeLine(type));
+  renderEditor(); renderPreview();
+}
+function removeLine(blockId, branchId, lineId){
+  const b = blocks.find(b => b.id === blockId);
+  const br = b.branches.find(br => br.id === branchId);
+  br.lines = br.lines.filter(l => l.id !== lineId);
+  renderEditor(); renderPreview();
+}
+function updateLine(blockId, branchId, lineId, field, value){
+  const b = blocks.find(b => b.id === blockId);
+  const br = b.branches.find(br => br.id === branchId);
+  const l = br.lines.find(l => l.id === lineId);
+  l[field] = value;
+  renderPreview();
+}
+function toggleLineInner(blockId, branchId, lineId){
+  const b = blocks.find(b => b.id === blockId);
+  const br = b.branches.find(br => br.id === branchId);
+  const l = br.lines.find(l => l.id === lineId);
+  l.inner = !l.inner;
+  renderEditor(); renderPreview();
+}
+
+function esc(s){
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---------- Inline formatting: **bold** and {{c:#hex|colored text}} ----------
+const FMT_COLORS = [
+  {name:'레드', hex:'#a8402f'},
+  {name:'골드', hex:'#b8923f'},
+  {name:'바이올렛', hex:'#7b6a9e'},
+  {name:'틸', hex:'#4f8f8a'},
+  {name:'블루', hex:'#5c7a99'},
+  {name:'오렌지', hex:'#c17a3d'},
+];
+
+function formatToolbarHTML(textareaId){
+  const swatches = FMT_COLORS.map(c =>
+    `<button type="button" class="fmt-color" style="background:${c.hex}" title="${c.name} 색상 적용" onmousedown="event.preventDefault()" onclick="wrapFormat('${textareaId}','color','${c.hex}')"></button>`
+  ).join('');
+  return `<div class="format-toolbar">
+    <button type="button" class="fmt-bold" title="굵게" onmousedown="event.preventDefault()" onclick="wrapFormat('${textareaId}','bold')">B</button>
+    ${swatches}
+  </div>`;
+}
+
+function wrapFormat(textareaId, mode, color){
+  const ta = document.getElementById(textareaId);
+  if(!ta) return;
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  const val = ta.value;
+  const selected = start !== end ? val.slice(start, end) : '텍스트';
+  let prefix, suffix;
+  if(mode === 'bold'){ prefix = '**'; suffix = '**'; }
+  else { prefix = '{{c:' + color + '|'; suffix = '}}'; }
+  ta.value = val.slice(0, start) + prefix + selected + suffix + val.slice(end);
+  ta.focus();
+  ta.selectionStart = start + prefix.length;
+  ta.selectionEnd = start + prefix.length + selected.length;
+  ta.dispatchEvent(new Event('input', {bubbles:true}));
+}
+
+function applyInlineFormat(escapedText){
+  let t = escapedText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/\{\{c:(#?[a-zA-Z0-9]+)\|(.+?)\}\}/g, (m, color, txt) => `<span style="color:${color}">${txt}</span>`);
+  return t;
+}
+
+function nl2br(s){ return applyInlineFormat(esc(s)).replace(/\n/g,'<br>'); }
+
+function renderEditor(){
+  const list = document.getElementById('blockList');
+  if(blocks.length === 0){
+    list.innerHTML = '<div class="empty-hint">위 버튼을 눌러 나레이션, 대사, 이미지, 장면 전환, 선택지를 추가하세요.</div>';
+    return;
+  }
+  list.innerHTML = blocks.map((b, idx) => blockCardHTML(b, idx)).join('');
+}
+
+function blockCardHTML(b, idx){
+  const typeLabel = {narration:'나레이션', dialogue:'대사', image:'이미지', divider:'장면 전환', choice:'선택지'}[b.type];
+  const controls = `
+    <div class="block-actions">
+      <button onclick="moveBlock('${b.id}',-1)" title="위로">↑</button>
+      <button onclick="moveBlock('${b.id}',1)" title="아래로">↓</button>
+      <button onclick="removeBlock('${b.id}')" title="삭제">✕</button>
+    </div>`;
+  let body = '';
+
+  if(b.type === 'narration'){
+    body = `
+      <div class="field">
+        <label>나레이션 텍스트</label>
+        ${formatToolbarHTML('txt_'+b.id)}
+        <textarea id="txt_${b.id}" oninput="updateBlock('${b.id}','text',this.value)" placeholder="장면을 묘사하는 나레이션">${esc(b.text)}</textarea>
+      </div>`;
+  }
+  else if(b.type === 'dialogue'){
+    body = `
+      <div class="field">
+        <label>화자</label>
+        <input type="text" value="${esc(b.speaker)}" oninput="updateBlock('${b.id}','speaker',this.value)" placeholder="캐릭터 이름">
+      </div>
+      <div class="field">
+        <label>대사</label>
+        ${formatToolbarHTML('txt_'+b.id)}
+        <textarea id="txt_${b.id}" oninput="updateBlock('${b.id}','text',this.value)" placeholder="대사 내용">${esc(b.text)}</textarea>
+      </div>
+      <label class="inner-toggle"><input type="checkbox" ${b.inner?'checked':''} onchange="toggleInner('${b.id}')"> 속마음 / 독백 스타일</label>`;
+  }
+  else if(b.type === 'image'){
+    body = `
+      <div class="field">
+        <label>이미지 URL</label>
+        <input type="text" value="${esc(b.src)}" oninput="updateBlock('${b.id}','src',this.value)" placeholder="https://...">
+      </div>
+      <div class="field">
+        <label>캡션</label>
+        <input type="text" value="${esc(b.caption)}" oninput="updateBlock('${b.id}','caption',this.value)" placeholder="장면 설명 / 컷 번호">
+      </div>`;
+  }
+  else if(b.type === 'divider'){
+    body = `
+      <div class="field">
+        <label>구분 텍스트</label>
+        <input type="text" value="${esc(b.label)}" oninput="updateBlock('${b.id}','label',this.value)" placeholder="· · ·">
+      </div>`;
+  }
+  else if(b.type === 'choice'){
+    body = `
+      <div style="font-size:0.78rem; color:var(--ui-ink-3); margin-bottom:0.5rem;">선택지마다 다른 나레이션/대사를 넣을 수 있습니다.</div>
+      ${b.branches.map(br => branchHTML(b.id, br)).join('')}
+      <button class="tiny-btn" style="margin-top:0.4rem;" onclick="addBranch('${b.id}')">+ 선택지 추가</button>`;
+  }
+
+  return `
+    <div class="block-card">
+      <div class="block-head">
+        <span class="block-type">${typeLabel}</span>
+        ${controls}
+      </div>
+      ${body}
+    </div>`;
+}
+
+function branchHTML(blockId, br){
+  return `
+    <div class="branch-box">
+      <div class="branch-head">
+        <strong>선택지</strong>
+        <button class="tiny-btn" onclick="removeBranch('${blockId}','${br.id}')">선택지 삭제</button>
+      </div>
+      <div class="field">
+        <label>선택지 문구</label>
+        <input type="text" value="${esc(br.label)}" oninput="updateBranch('${blockId}','${br.id}','label',this.value)" placeholder="예: '진실을 말한다'">
+      </div>
+      ${br.lines.map(l => lineHTML(blockId, br.id, l)).join('')}
+      <div style="display:flex; gap:0.4rem; margin-top:0.4rem;">
+        <button class="tiny-btn" onclick="addLine('${blockId}','${br.id}','narration')">+ 나레이션 줄</button>
+        <button class="tiny-btn" onclick="addLine('${blockId}','${br.id}','dialogue')">+ 대사 줄</button>
+      </div>
+    </div>`;
+}
+
+function lineHTML(blockId, branchId, l){
+  const taId = 'txt_' + blockId + '_' + branchId + '_' + l.id;
+  if(l.type === 'narration'){
+    return `
+      <div class="line-item">
+        <div class="line-fields">
+          <select disabled><option>나레이션</option></select>
+          ${formatToolbarHTML(taId)}
+          <textarea id="${taId}" oninput="updateLine('${blockId}','${branchId}','${l.id}','text',this.value)" placeholder="나레이션 텍스트" style="width:100%; min-height:2rem; font-size:0.82rem; padding:0.35rem; border:1px solid var(--ui-border-strong); border-radius:4px;">${esc(l.text)}</textarea>
+        </div>
+        <button class="tiny-btn" onclick="removeLine('${blockId}','${branchId}','${l.id}')">✕</button>
+      </div>`;
+  }
+  return `
+    <div class="line-item">
+      <div class="line-fields">
+        <select disabled><option>대사</option></select>
+        <input type="text" value="${esc(l.speaker)}" oninput="updateLine('${blockId}','${branchId}','${l.id}','speaker',this.value)" placeholder="화자" style="font-size:0.82rem; padding:0.35rem; border:1px solid var(--ui-border-strong); border-radius:4px;">
+        ${formatToolbarHTML(taId)}
+        <textarea id="${taId}" oninput="updateLine('${blockId}','${branchId}','${l.id}','text',this.value)" placeholder="대사 내용" style="width:100%; min-height:2rem; font-size:0.82rem; padding:0.35rem; border:1px solid var(--ui-border-strong); border-radius:4px;">${esc(l.text)}</textarea>
+        <label class="inner-toggle" style="font-size:0.72rem;"><input type="checkbox" ${l.inner?'checked':''} onchange="toggleLineInner('${blockId}','${branchId}','${l.id}')"> 독백 스타일</label>
+      </div>
+      <button class="tiny-btn" onclick="removeLine('${blockId}','${branchId}','${l.id}')">✕</button>
+    </div>`;
+}
+
+// ---------- Story HTML generation (shared by preview + copy) ----------
+function buildStoryHTML(){
+  let out = `<div class="story-page">\n  <div class="story-meta">\n`;
+  if(meta.category) out += `    <div class="story-category-tag">${esc(meta.category)}</div>\n`;
+  if(meta.title) out += `    <h1 class="story-title">${esc(meta.title)}</h1>\n`;
+  if(meta.subtitle) out += `    <p class="story-subtitle">${esc(meta.subtitle)}</p>\n`;
+  out += `  </div>\n\n`;
+
+  blocks.forEach(b => { out += blockToHTML(b) + '\n\n'; });
+
+  out += `</div>`;
+  return out;
+}
+
+function blockToHTML(b){
+  if(b.type === 'narration'){
+    return `  <p class="narration">${nl2br(b.text)}</p>`;
+  }
+  if(b.type === 'dialogue'){
+    return `  <div class="dialogue${b.inner?' inner':''}">\n    <span class="speaker">${esc(b.speaker)}</span>\n    <span class="line">${nl2br(b.text)}</span>\n  </div>`;
+  }
+  if(b.type === 'image'){
+    return `  <div class="scene-image">\n    <img src="${esc(b.src)}" alt="${esc(b.caption)}">\n    <p class="caption">${esc(b.caption)}</p>\n  </div>`;
+  }
+  if(b.type === 'divider'){
+    return `  <div class="scene-divider"><span>${esc(b.label)}</span></div>`;
+  }
+  if(b.type === 'choice'){
+    let s = `  <div class="story-choice">\n`;
+    b.branches.forEach(br => {
+      s += `    <details class="choice-branch">\n      <summary class="choice-label">${esc(br.label)}</summary>\n      <div class="choice-content">\n`;
+      br.lines.forEach(l => {
+        if(l.type === 'narration'){
+          s += `        <p class="narration">${nl2br(l.text)}</p>\n`;
+        } else {
+          s += `        <div class="dialogue${l.inner?' inner':''}">\n          <span class="speaker">${esc(l.speaker)}</span>\n          <span class="line">${nl2br(l.text)}</span>\n        </div>\n`;
+        }
+      });
+      s += `      </div>\n    </details>\n`;
+    });
+    s += `  </div>`;
+    return s;
+  }
+  return '';
+}
+
+// ---------- Preview (embeds the user's story.css so the preview matches exactly) ----------
+const PREVIEW_CSS = `
+:root{
+  --serif-en:'Georgia','Times New Roman',serif;
+  --serif-kr:'Noto Serif KR','Nanum Myeongjo',serif;
+  --serif-old:'Times New Roman',serif;
+  --mono:'Courier New',monospace;
+  --ink:#26231d; --ink-2:#5a5548; --ink-3:#8b8575;
+  --paper:#ffffff; --paper-2:#f4f1ea;
+  --border:#e2ddd2; --border-strong:#cfc8b8;
+  --red:#a8402f; --gold:#b8923f; --violet:#7b6a9e;
+  --teal-muted:#4f8f8a; --blue-muted:#5c7a99; --orange:#c17a3d;
+}
+body{background:#fff; margin:0;}
+.story-page { max-width: 680px; margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+.story-meta { text-align: center; margin-bottom: 3rem; }
+.story-category-tag { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.15em; color: var(--red); }
+.story-title    { font-family: var(--serif-en); font-weight: 700; font-size: 2.1rem; color: var(--ink); margin: 0.5rem 0 0.35rem; }
+.story-subtitle { font-family: var(--serif-old); font-style: italic; font-size: 0.95rem; color: var(--ink-3); }
+.narration { font-family: var(--serif-kr); font-style: italic; color: var(--ink-2); line-height: 2; margin: 1.5rem 0; }
+.dialogue { display: flex; gap: 1rem; margin: 1.25rem 0; padding-left: 1rem; border-left: 2px solid var(--border-strong); }
+.dialogue .speaker { flex-shrink: 0; width: 74px; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.05em; color: var(--red); padding-top: 0.2rem; }
+.dialogue .line   { font-family: var(--serif-kr); color: var(--ink); line-height: 1.9; }
+.dialogue.inner   { border-left-color: var(--border); }
+.dialogue.inner .speaker { color: var(--ink-3); }
+.dialogue.inner .line    { font-style: italic; color: var(--ink-2); }
+.scene-image { margin: 2.75rem 0; text-align: center; }
+.scene-image img { max-width: 100%; border: 6px solid var(--paper-2); outline: 1px solid var(--border-strong); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+.scene-image .caption { margin-top: 0.6rem; font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.05em; color: var(--ink-3); }
+.scene-divider { display: flex; align-items: center; gap: 1rem; margin: 3.25rem 0; color: var(--border-strong); }
+.scene-divider::before, .scene-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.scene-divider span { font-size: 0.85rem; letter-spacing: 0.4em; }
+
+/* 선택지 (원본 css에 없는 항목이라 미리보기용으로 추가 — 실제 사이트에 맞는 스타일을 추가해 주세요) */
+.story-choice { margin: 2.5rem 0; display:flex; flex-direction:column; gap:0.75rem; }
+.choice-branch { border: 1px solid var(--border-strong); border-radius: 4px; background: var(--paper-2); overflow: hidden; }
+.choice-branch summary {
+  cursor: pointer; list-style: none; user-select: none;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.85rem 1.25rem;
+  font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--violet);
+}
+.choice-branch summary::-webkit-details-marker { display: none; }
+.choice-branch summary::after {
+  content: '+'; font-family: var(--serif-en); font-size: 1.1rem; color: var(--ink-3); flex-shrink: 0;
+}
+.choice-branch[open] summary { border-bottom: 1px dashed var(--border-strong); }
+.choice-branch[open] summary::after { content: '−'; }
+.choice-content { padding: 1.1rem 1.25rem 1.35rem; }
+.choice-content .narration:first-child, .choice-content .dialogue:first-child { margin-top: 0; }
+`;
+
+function renderPreview(){
+  const html = buildStoryHTML();
+  const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${PREVIEW_CSS}</style></head><body>${html}</body></html>`;
+  document.getElementById('previewFrame').srcdoc = doc;
+}
+
+function copyHTML(){
+  const html = buildStoryHTML();
+  const status = document.getElementById('copyStatus');
+  navigator.clipboard.writeText(html).then(() => {
+    status.textContent = '복사됨!';
+    setTimeout(() => status.textContent = '', 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = html;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    status.textContent = '복사됨!';
+    setTimeout(() => status.textContent = '', 2000);
+  });
+}
+
+// ---------- Tabs: 메인 / HTML ----------
+let rawHtmlInitialized = false;
+
+function switchTab(tab){
+  document.getElementById('tab-main').classList.toggle('active', tab === 'main');
+  document.getElementById('tab-html').classList.toggle('active', tab === 'html');
+  document.getElementById('view-main').classList.toggle('active', tab === 'main');
+  document.getElementById('view-html').classList.toggle('active', tab === 'html');
+  if(tab === 'html' && !rawHtmlInitialized){
+    resetHtmlFromBlocks();
+    rawHtmlInitialized = true;
+  }
+}
+
+function resetHtmlFromBlocks(){
+  document.getElementById('rawHtmlEditor').value = buildStoryHTML();
+  renderRawPreview();
+}
+
+function onRawHtmlEdit(){ renderRawPreview(); }
+
+function renderRawPreview(){
+  const html = document.getElementById('rawHtmlEditor').value;
+  const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${PREVIEW_CSS}</style></head><body>${html}</body></html>`;
+  document.getElementById('rawPreviewFrame').srcdoc = doc;
+}
+
+function copyRawHTML(){
+  const html = document.getElementById('rawHtmlEditor').value;
+  const status = document.getElementById('rawCopyStatus');
+  navigator.clipboard.writeText(html).then(() => {
+    status.textContent = '복사됨!';
+    setTimeout(() => status.textContent = '', 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = html;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    status.textContent = '복사됨!';
+    setTimeout(() => status.textContent = '', 2000);
+  });
+}
+
+// ---------- JSON 저장 / 불러오기 ----------
+function exportJSON(){
+  const data = JSON.stringify({ meta, blocks }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const filename = (meta.title && meta.title.trim()) ? meta.title.trim() : '무제 스토리';
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename.replace(/[\\/:*?"<>|]/g, '_') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function triggerImport(){ document.getElementById('importFileInput').click(); }
+
+function importJSON(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!data || typeof data !== 'object') throw new Error('invalid json');
+
+      meta = Object.assign({ category:'', title:'', subtitle:'' }, data.meta || {});
+      blocks = Array.isArray(data.blocks) ? data.blocks : [];
+
+      // uid 카운터를 불러온 데이터의 최대 id보다 크게 재설정 (id 충돌 방지)
+      let maxNum = 0;
+      const scan = (obj) => {
+        if(obj && typeof obj === 'object'){
+          if(typeof obj.id === 'string'){
+            const m = obj.id.match(/^b(\d+)$/);
+            if(m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+          }
+          Object.values(obj).forEach(v => {
+            if(Array.isArray(v)) v.forEach(scan);
+            else if(v && typeof v === 'object') scan(v);
+          });
+        }
+      };
+      blocks.forEach(scan);
+      uid = maxNum + 1;
+
+      document.getElementById('meta-category').value = meta.category || '';
+      document.getElementById('meta-title').value = meta.title || '';
+      document.getElementById('meta-subtitle').value = meta.subtitle || '';
+
+      renderEditor();
+      renderPreview();
+      rawHtmlInitialized = false; // HTML 탭을 다시 열면 새 데이터로 새로고침되도록
+    }catch(err){
+      alert('JSON 파일을 읽는 중 오류가 발생했습니다. 올바른 형식의 파일인지 확인해주세요.');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// init
+renderEditor();
+renderPreview();
+</script>
+</body>
+</html>

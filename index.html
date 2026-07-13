@@ -680,7 +680,13 @@ body{background:#fff; margin:0;}
 function renderPreview(){
   const html = buildStoryHTML();
   const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${PREVIEW_CSS}</style></head><body>${html}</body></html>`;
-  document.getElementById('previewFrame').srcdoc = doc;
+  const frame = document.getElementById('previewFrame');
+  let scrollY = 0;
+  try{ scrollY = frame.contentWindow ? frame.contentWindow.scrollY : 0; }catch(e){}
+  frame.onload = () => {
+    try{ frame.contentWindow.scrollTo(0, scrollY); }catch(e){}
+  };
+  frame.srcdoc = doc;
 }
 
 function copyHTML(){
@@ -725,7 +731,13 @@ function onRawHtmlEdit(){ renderRawPreview(); }
 function renderRawPreview(){
   const html = document.getElementById('rawHtmlEditor').value;
   const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${PREVIEW_CSS}</style></head><body>${html}</body></html>`;
-  document.getElementById('rawPreviewFrame').srcdoc = doc;
+  const frame = document.getElementById('rawPreviewFrame');
+  let scrollY = 0;
+  try{ scrollY = frame.contentWindow ? frame.contentWindow.scrollY : 0; }catch(e){}
+  frame.onload = () => {
+    try{ frame.contentWindow.scrollTo(0, scrollY); }catch(e){}
+  };
+  frame.srcdoc = doc;
 }
 
 function copyRawHTML(){

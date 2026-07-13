@@ -155,6 +155,7 @@
         <span class="hint">블록 추가:</span>
         <button onclick="addBlock('narration')">+ 나레이션</button>
         <button onclick="addBlock('dialogue')">+ 대사</button>
+        <button onclick="addBlock('dialogue-hero')">+ 실베스터 대사</button>
         <button onclick="addBlock('image')">+ 이미지</button>
         <button onclick="addBlock('divider')">+ 장면 전환</button>
         <button onclick="addBlock('choice')">+ 선택지</button>
@@ -202,12 +203,19 @@ function updateMeta(field, value){ meta[field] = value; renderPreview(); }
 
 function addBlock(type){
   const id = newId();
-  let block = { id, type };
-  if(type === 'narration') block.text = '';
-  if(type === 'dialogue'){ block.speaker=''; block.text=''; block.inner=false; }
-  if(type === 'image'){ block.src=''; block.caption=''; }
-  if(type === 'divider') block.label = '✦';
-  if(type === 'choice'){ block.branches = [ makeBranch() ]; }
+  const isHero = (type === 'dialogue-hero');
+  const actualType = isHero ? 'dialogue' : type;
+  let block = { id, type: actualType };
+  if(actualType === 'narration') block.text = '';
+  if(actualType === 'dialogue'){
+    block.speaker = isHero ? '실베스터' : '';
+    block.text = '';
+    block.inner = false;
+    block.hero = isHero;
+  }
+  if(actualType === 'image'){ block.src=''; block.caption=''; }
+  if(actualType === 'divider') block.label = '✦';
+  if(actualType === 'choice'){ block.branches = [ makeBranch() ]; }
   blocks.push(block);
   renderEditor(); renderPreview();
 }
@@ -341,7 +349,8 @@ function renderEditor(){
 }
 
 function blockCardHTML(b, idx){
-  const typeLabel = {narration:'나레이션', dialogue:'대사', image:'이미지', divider:'장면 전환', choice:'선택지'}[b.type];
+  let typeLabel = {narration:'나레이션', dialogue:'대사', image:'이미지', divider:'장면 전환', choice:'선택지'}[b.type];
+  if(b.hero) typeLabel = '주인공 대사 (실베스터)';
   const controls = `
     <div class="block-actions">
       <button onclick="moveBlock('${b.id}',-1)" title="위로">↑</button>
@@ -470,8 +479,9 @@ function blockToHTML(b){
     return `  <p class="narration">${nl2br(b.text)}</p>`;
   }
   if(b.type === 'dialogue'){
-    return `  <div class="dialogue${b.inner?' inner':''}">\n    <span class="speaker">${esc(b.speaker)}</span>\n    <span class="line">${nl2br(b.text)}</span>\n  </div>`;
-  }
+  const cls = 'dialogue' + (b.hero ? ' hero' : '') + (b.inner ? ' inner' : '');
+  return `  <div class="${cls}">\n    <span class="speaker">${esc(b.speaker)}</span>\n    <span class="line">${nl2br(b.text)}</span>\n  </div>`;
+}
   if(b.type === 'image'){
     return `  <div class="scene-image">\n    <img src="${esc(b.src)}" alt="${esc(b.caption)}">\n    <p class="caption">${esc(b.caption)}</p>\n  </div>`;
   }
@@ -519,6 +529,7 @@ body{background:#fff; margin:0;}
 .narration { font-family: var(--serif-kr); font-style: italic; color: var(--ink-2); line-height: 2; margin: 1.5rem 0; }
 .dialogue { display: flex; gap: 1rem; margin: 1.25rem 0; padding-left: 1rem; border-left: 2px solid var(--border-strong); }
 .dialogue .speaker { flex-shrink: 0; width: 74px; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.05em; color: var(--red); padding-top: 0.2rem; }
+.dialogue.hero .speaker { color: var(--violet); }
 .dialogue .line   { font-family: var(--serif-kr); color: var(--ink); line-height: 1.9; }
 .dialogue.inner   { border-left-color: var(--border); }
 .dialogue.inner .speaker { color: var(--ink-3); }

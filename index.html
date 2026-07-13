@@ -168,9 +168,13 @@
         <div class="editor-pane">
           <div class="pane-header">
             <h2>🖋 HTML 직접 수정</h2>
-            <button class="tiny-btn" onclick="resetHtmlFromBlocks()">블록 내용으로 새로고침</button>
+            <div style="display:flex; gap:0.4rem;">
+              <button class="tiny-btn" onclick="resetHtmlFromBlocks()">블록 내용으로 새로고침</button>
+              <button class="tiny-btn" onclick="applyHtmlToBlocks()">→ 메인에 반영</button>
+              <span id="applyStatus" style="font-size:0.76rem; margin-left:0.3rem;"></span>
+            </div>
           </div>
-          <div class="html-note">여기서 수정한 내용은 왼쪽 블록 데이터에는 반영되지 않습니다. 복사해서 쓰기 전에 자유롭게 다듬어보세요.</div>
+          <div class="html-note">"메인에 반영"을 누르면 여기 적힌 HTML을 분석해서 왼쪽 블록 데이터를 덮어씁니다. class명이나 태그 구조를 크게 바꾸면 인식하지 못할 수 있어요.</div>
           <textarea id="rawHtmlEditor" class="html-editor" oninput="onRawHtmlEdit()" spellcheck="false"></textarea>
         </div>
 
@@ -339,6 +343,15 @@ function applyInlineFormat(escapedText){
 
 function nl2br(s){ return applyInlineFormat(esc(s)).replace(/\n/g,'<br>'); }
 
+// ---------- HTML → text (reverse of nl2br, used when parsing raw HTML back into blocks) ----------
+function html2text(html){
+  let t = (html || '').replace(/<br\s*\/?>/gi, '\n');
+  t = t.replace(/<strong>([\s\S]*?)<\/strong>/gi, '**$1**');
+  t = t.replace(/<span style="color:(.*?)">([\s\S]*?)<\/span>/gi, '{{c:$1|$2}}');
+  t = t.replace(/<[^>]+>/g, '');
+  return t.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&amp;/g,'&');
+}
+
 function renderEditor(){
   const list = document.getElementById('blockList');
   if(blocks.length === 0){
@@ -479,9 +492,9 @@ function blockToHTML(b){
     return `  <p class="narration">${nl2br(b.text)}</p>`;
   }
   if(b.type === 'dialogue'){
-  const cls = 'dialogue' + (b.hero ? ' hero' : '') + (b.inner ? ' inner' : '');
-  return `  <div class="${cls}">\n    <span class="speaker">${esc(b.speaker)}</span>\n    <span class="line">${nl2br(b.text)}</span>\n  </div>`;
-}
+    const cls = 'dialogue' + (b.hero ? ' hero' : '') + (b.inner ? ' inner' : '');
+    return `  <div class="${cls}">\n    <span class="speaker">${esc(b.speaker)}</span>\n    <span class="line">${nl2br(b.text)}</span>\n  </div>`;
+  }
   if(b.type === 'image'){
     return `  <div class="scene-image">\n    <img src="${esc(b.src)}" alt="${esc(b.caption)}">\n    <p class="caption">${esc(b.caption)}</p>\n  </div>`;
   }
@@ -505,6 +518,109 @@ function blockToHTML(b){
     return s;
   }
   return '';
+}
+
+// ---------- HTML → blocks (reverse of buildStoryHTML, used by "메인에 반영") ----------
+function parseHTMLToBlocks(htmlString){
+  const doc = new DOMParser().parseFromString(htmlString, 'text/html');
+  const root = doc.querySelector('.story-page') || doc.body;
+
+  const newMeta = { category: '', title: '', subtitle: '' };
+  const catEl = root.querySelector('.story-category-tag');
+  const titleEl = root.querySelector('.story-title');
+  const subEl = root.querySelector('.story-subtitle');
+  if(catEl) newMeta.category = catEl.textContent.trim();
+  if(titleEl) newMeta.title = titleEl.textContent.trim();
+  if(subEl) newMeta.subtitle = subEl.textContent.trim();
+
+  const newBlocks = [];
+  const skipped = [];
+  // 클래스가 정확히 일치하는 요소만 골라내지 않고, 최상위 자식 전부를 순회한다.
+  // (이렇게 해야 인식 못 하는 태그가 있어도 "조용히 버려지는" 대신 눈에 보이게 처리된다)
+  const children = [...root.children].filter(el => !el.classList.contains('story-meta'));
+
+  if(children.length === 0) throw new Error('구조를 인식할 수 없습니다');
+
+  children.forEach(el => {
+    if(el.matches('p.narration')){
+      newBlocks.push({ id: newId(), type: 'narration', text: html2text(el.innerHTML) });
+    }
+    else if(el.matches('div.dialogue')){
+      newBlocks.push({
+        id: newId(), type: 'dialogue',
+        speaker: (el.querySelector('.speaker')?.textContent || '').trim(),
+        text: html2text(el.querySelector('.line')?.innerHTML || ''),
+        inner: el.classList.contains('inner'),
+        hero: el.classList.contains('hero')
+      });
+    }
+    else if(el.matches('div.scene-image')){
+      newBlocks.push({
+        id: newId(), type: 'image',
+        src: el.querySelector('img')?.getAttribute('src') || '',
+        caption: (el.querySelector('.caption')?.textContent || '').trim()
+      });
+    }
+    else if(el.matches('div.scene-divider')){
+      newBlocks.push({ id: newId(), type: 'divider', label: (el.querySelector('span')?.textContent || '').trim() });
+    }
+    else if(el.matches('div.story-choice')){
+      const branches = [...el.querySelectorAll(':scope > details.choice-branch')].map(br => ({
+        id: newId(),
+        label: (br.querySelector('.choice-label')?.textContent || '').trim(),
+        lines: [...br.querySelectorAll('.choice-content > *')].map(lineEl => {
+          if(lineEl.matches('.narration')){
+            return { id: newId(), type: 'narration', text: html2text(lineEl.innerHTML), speaker: '', inner: false };
+          }
+          return {
+            id: newId(), type: 'dialogue',
+            speaker: (lineEl.querySelector('.speaker')?.textContent || '').trim(),
+            text: html2text(lineEl.querySelector('.line')?.innerHTML || ''),
+            inner: lineEl.classList.contains('inner')
+          };
+        })
+      }));
+      newBlocks.push({ id: newId(), type: 'choice', branches });
+    }
+    else {
+      // 알 수 없는 구조는 내용을 잃지 않도록 일단 나레이션 블록으로 임시 변환한다.
+      newBlocks.push({ id: newId(), type: 'narration', text: html2text(el.innerHTML || '') || el.textContent.trim() });
+      skipped.push(el.tagName.toLowerCase() + (el.className ? '.' + el.className : ''));
+    }
+  });
+
+  return { newMeta, newBlocks, skipped };
+}
+
+function applyHtmlToBlocks(){
+  const status = document.getElementById('applyStatus');
+  try{
+    const html = document.getElementById('rawHtmlEditor').value;
+    const { newMeta, newBlocks, skipped } = parseHTMLToBlocks(html);
+    meta = newMeta;
+    blocks = newBlocks;
+
+    document.getElementById('meta-category').value = meta.category || '';
+    document.getElementById('meta-title').value = meta.title || '';
+    document.getElementById('meta-subtitle').value = meta.subtitle || '';
+
+    renderEditor();
+    renderPreview();
+
+    if(skipped.length > 0){
+      status.style.color = '#a8402f';
+      status.textContent = '반영됨 (단, ' + skipped.length + '개 요소 인식 실패: ' + skipped.join(', ') + ' → 나레이션으로 임시 변환)';
+    } else {
+      status.style.color = '#3b7a4a';
+      status.textContent = '반영됨!';
+    }
+    setTimeout(() => { status.textContent = ''; }, 6000);
+  }catch(err){
+    console.error('applyHtmlToBlocks error:', err);
+    status.style.color = '#a8402f';
+    status.textContent = 'HTML 구조를 인식하지 못했습니다: ' + err.message;
+    setTimeout(() => { status.textContent = ''; }, 6000);
+  }
 }
 
 // ---------- Preview (embeds the user's story.css so the preview matches exactly) ----------
